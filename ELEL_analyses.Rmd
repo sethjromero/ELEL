@@ -1,0 +1,1214 @@
+---
+title:  |
+  | ***Elymus elymoides***
+  | <span style='font-size: 18pt'>*Initial Patterns*</span>
+output: 
+  html_document:
+    theme: flatly
+    highlight: tango
+---
+
+```{css, echo=FALSE}
+body .main-container {
+  max-width: 2000px !important;
+  width: 2000px !important;
+}
+body {
+  max-width: 2000px !important;
+  margin-right: auto;
+  margin-left:auto;
+}
+```
+
+```{r, echo=FALSE}
+library(knitr)
+opts_chunk$set(echo = F, message = F, warning = F, fig.width = 10, fig.height = 10, fig.align = 'center')
+```
+
+```{r}
+# tidy/plotting related
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(colorspace)
+library(ggrepel)
+library(patchwork)
+library(data.table)
+# GIS related
+library(rnaturalearth)
+library(sf)
+library(elevatr)
+library(raster)
+library(terra)
+# plotting related, especially useful for maps
+library(ggnewscale)
+library(tidyterra)
+
+library(scatterpie)
+library(MoMAColors)
+library(ggh4x)
+library(cowplot)
+
+setwd("~/Documents/GitHub/ELEL/")
+```
+
+```{r}
+PopsToChange <- c('PV_0', 'PV_1', 'HW_0', 'HW_1')
+
+makePopId <- function(fileIndv){
+  PopIDdf = read.table(fileIndv, sep="\t") %>%
+    as.data.frame() %>%
+    rename(All = V1) %>%
+    mutate(Project = str_split_i(All, '_', 2),
+           Pop = ifelse(Project == 'AG',
+                        str_sub(str_split_i(All, '_', 3), 1, 2),
+                        ifelse(str_sub(Project, 1, 1) == 'B',
+                               paste(str_split_i(All, '_', 3), str_sub(Project, 2, 2), sep = '_'),
+                               str_split_i(All, '_', 3))),
+           ID = str_split_i(str_split_i(All, '_', 4), '\\.', 1)) %>%
+    mutate(Pop = ifelse(Pop %in% PopsToChange,
+                        case_when(Pop == 'PV_0' ~ 'PL_0',
+                                  Pop == 'PV_1' ~ 'PL_1',
+                                  Pop == 'HW_0' ~ 'HO_0',
+                                  Pop == 'HW_1' ~ 'HO_1'),
+                        Pop))
+  return(PopIDdf)
+}
+
+ELELpop <- makePopId('filtering/ELEL.bithin.q30.iBC20m90.a65.maf03.012.indv')
+
+eePopOrder <- c('W640429', 'W652430', 'W661012', 'DH', 'JC', 'W656338', 'LV', 
+                'W652483', 'NF', 'VM', 'SS', 'PT', 'W659426', 'W640732',
+                'PL_0', 'PL_1', 'TC', 'PL', 'BM', 'JC_0', 'JC_1', 'W643085', 'BV',
+                'EW', 'AH', 'AS', 'MD', 'W656003', 'W644339', 'FR', 'BC', 'HO_0', 'HO_1', 'W655233', 
+                'W655235', 'HO', 'GB', 'W640119', 'BK', 'PG', 'HA', 'SR', 'CO', 'WD',
+                'BS', 'CC', 'CF', 'CH', 'CM', 'CR', 'CW', 'DW', 'IW', 'JM',
+                'LC', 'MF', 'NR', 'PF', 'SA', 'SY', 'WM', 'WP', 'WW', 'HI',
+                'AR', 'SD', 'NC', 'DR', 'MP', 'OC', 'PU', 'W632516', 'W632710', 'W657679',
+                'CD', 'DN', 'LM', 'SF', 'BP', 'BL', 'HC', 'MM', 'SC', 'WR')
+
+lupi10 <- c("#90a585", "#44a595", "#fa781b", "#502c75", "#ffa5ca", "#489236", "#ba039b", "#b6e7e0", "#fdec49", "#2364AF")
+lupi9 <- lupi10[-1]
+lupi8 <- lupi9[-1]
+lupi7 <- lupi8[-1]
+lupi6 <- lupi7[-1]
+lupi5 <- lupi6[-1]
+lupi4 <- lupi5[-1]
+lupi3 <- lupi4[-1]
+lupi2 <- lupi3[-1]
+
+
+anck2 <- read.csv('entropy/q2.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder))
+anck3 <- read.csv('entropy/q3.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder))
+anck3$ancGroup <- factor(recode(anck3$ancGroup, '1' = '2', '2' = '1'))
+anck4 <- read.csv('entropy/q4.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder))
+anck4$ancGroup <- factor(recode(anck4$ancGroup, '0' = '2', '1' = '3', '2' = '1', '3' = '0'))
+anck5 <- read.csv('entropy/q5.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder))
+anck5$ancGroup <- factor(recode(anck5$ancGroup, '0' = '1', '1' = '3', '3' = '4', '4' = '0'))
+anck6 <- read.csv('entropy/q6.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder))
+anck6$ancGroup <- factor(recode(anck6$ancGroup, '0' = '3', '1' = '4', '2' = '5', '3' = '0', '4' = '2', '5' = '1'))
+
+anck7 <- read.csv('entropy/q7.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder),
+         ind = as.character(as.integer(str_split_i(param, pattern = '_', i = 3)) + 1))
+anck7$ancGroup <- factor(recode(anck7$ancGroup, '0' = '6', '2' = '4', '3' = '5', '4' = '0', '5' = '3', '6' = '2'))
+
+anck8 <- read.csv('entropy/q8.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder))
+anck8$ancGroup <- factor(recode(anck8$ancGroup, '0' = '3', '2' = '6', '3' = '7', '4' = '5', '5' = '0', '6' = '4', '7' = '2'))
+
+anck9 <- read.csv('entropy/q9.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder))
+anck9$ancGroup <- factor(recode(anck9$ancGroup, '0' = '3', '3' = '8', '8' = '7', '7' = '5', '5' = '2', '2' = '0'))
+
+anck10 <- read.csv('entropy/q10.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1),
+         Pop = factor(Pop, levels = eePopOrder))
+anck10$ancGroup <- factor(recode(anck10$ancGroup, '0' = '8', '8' = '0', '1' = '5', '5' = '1', '2' = '9', '9' = '6', '6' = '7', '7' = '4', '4' = '2'))
+
+kBarPlot <- function(qData, colors){
+  barPlot <- ggplot(data = qData, aes(x = factor(ID), y = mean, fill = ancGroup)) +
+    geom_col(width = 1, alpha = 1) +
+    facet_grid(~Pop, scale = "free", switch = "x", space = "free") +
+    scale_fill_manual(values = colors) +
+    theme_minimal() +
+    scale_y_continuous(expand = c(0, 0),) +
+    scale_x_discrete(expand = expansion(add = 1)) +
+    theme(legend.position = 'none',
+          panel.spacing.x = unit(0.001, "pt"),
+          axis.text.x = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid = element_blank(),
+          # strip.text.x = element_text(size = 10,
+          #                             angle = 90,
+          #                             face = 'bold'),
+          strip.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          plot.margin = margin(4, 4, 0, 4, 'pt'),
+          plot.background = element_rect(linewidth = 1, color = 'black'))
+  return(barPlot)
+}
+kBarPlot2 <- function(qData, colors){
+  barPlot <- ggplot(data = qData, aes(x = factor(ID), y = mean, fill = ancGroup)) +
+    geom_col(width = 1, alpha = 1) +
+    facet_grid(~Pop, scale = "free", switch = "x", space = "free") +
+    scale_fill_manual(values = colors) +
+    theme_minimal() +
+    scale_y_continuous(expand = c(0, 0),) +
+    scale_x_discrete(expand = expansion(add = 1)) +
+    theme(legend.position = 'none',
+          panel.spacing.x = unit(0.001, "pt"),
+          axis.text.x = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid = element_blank(),
+          strip.text.x = element_text(size = 10,
+                                      angle = 90,
+                                      face = 'bold'),
+          # strip.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          plot.margin = margin(4, 4, 0, 4, 'pt'),
+          plot.background = element_rect(linewidth = 1, color = 'black'))
+  return(barPlot)
+}
+```
+
+# Ancestry bar plots, k=2 through k=7
+
+```{r, fig.width=20, fig.height=7}
+k2bar <- kBarPlot(anck2, lupi2)
+k3bar <- kBarPlot(anck3, lupi3)
+k4bar <- kBarPlot(anck4, lupi4)
+k5bar <- kBarPlot(anck5, lupi5)
+k6bar <- kBarPlot(anck6, lupi6)
+k7bar <- kBarPlot2(anck7, lupi7)
+# k8bar <- kBarPlot(anck8, lupi8)
+# k9bar <- kBarPlot(anck9, lupi9)
+# k10bar <- kBarPlot(anck10, lupi10)
+# k7bar <- kBarPlot(anck2, lupi7)
+
+bars <- k2bar + k3bar + k4bar + k5bar + k6bar + k7bar + plot_layout(ncol = 1)
+
+bars
+
+# ggsave('ELEL_admix_k2k10.png', bars, height = 10, width = 20, dpi = 400)
+```
+
+```{r, warning = F, fig.width=8, fig.height=8}
+blueGroup <- subset(anck7, ancGroup == '6') %>%
+  filter(mean > 0.9)
+yellowGroup <- subset(anck7, ancGroup == '5') %>%
+  filter(mean > 0.9) %>%
+  filter(ID != '254')
+skyGroup <- subset(anck7, ancGroup == '4') %>%
+  filter(mean > 0.98) %>%
+  filter(ID != '793' & ID != '598')
+magentaGroup <- subset(anck7, ancGroup == '3') %>%
+  filter(mean > 0.9)
+greenGroup <- subset(anck7, ancGroup == '2') %>%
+  filter(mean > 0.9) %>%
+  filter(ID != '333')
+pinkGroup <- subset(anck7, ancGroup == '1') %>%
+  filter(mean > 0.9)
+purpleGroup <- subset(anck7, ancGroup == '0') %>%
+  filter(mean > 0.9)
+```
+
+```{r}
+RMlocs <- read.csv('../ExSitu_v_InSitu/ELEL_RobLocs.csv') %>%
+  rename(Pop = site_code,
+         Lat = latitude,
+         Long = longitude) %>%
+  dplyr::select(Pop, Lat, Long)
+
+GRINlocs <- read.csv('../ExSitu_v_InSitu/ELEL_GRINselection_forJakoby.csv') %>%
+  mutate(Pop = str_replace_all(Pop, ' ', '')) %>%
+  filter(Pop %in% as.vector(unique(ELELpop$Pop))) %>%
+  dplyr::select(Pop, Lat, Long)
+
+AGlocs <- read.csv('../ExSitu_v_InSitu/ELEL_latlong.csv') %>%
+  distinct(Pop, .keep_all = T) %>%
+  filter(Pop %in% as.vector(unique(subset(ELELpop, Project == 'AG')[,'Pop']))) %>%
+  dplyr::select(Pop, Lat, Long)
+
+AGRlocs <- rbind(RMlocs, GRINlocs, AGlocs) %>%
+  mutate(Long = ifelse(Long > 0, Long*-1, Long))
+AGRlocs[77:84,1] <- c('HO_0', 'HO_1', 'JC_0', 'JC_1', 'PL_0', 'PL_1', 'TC', 'PU')
+AGRlocs[77,2:3] <- subset(AGRlocs, Pop == 'HO')[,2:3]
+AGRlocs[78,2:3] <- subset(AGRlocs, Pop == 'HO')[,2:3]
+AGRlocs[79,2:3] <- subset(AGRlocs, Pop == 'JC')[,2:3]
+AGRlocs[80,2:3] <- subset(AGRlocs, Pop == 'JC')[,2:3]
+AGRlocs[81,2:3] <- subset(AGRlocs, Pop == 'PL')[,2:3]
+AGRlocs[82,2:3] <- subset(AGRlocs, Pop == 'PL')[,2:3]
+AGRlocs[83:84,2:3] <- 0
+```
+
+```{r, warning = F, fig.width=8, fig.height=8}
+col31 <- c("#64baaa", "#fa2e55", "#53f259", "#d148d3", "#5e9222",
+           "#74168e", "#b3e61c", "#5310f0", "#fbd127", "#772d48",
+           "#21f0b6", "#c36785", "#0b5313", "#ffa8ff", "#a43e03",
+           "#b7c8e2", "#1c4c5e", "#f27e3a", "#3588d1", "#544516", 
+           "#5979fe", "#b28b28", "#323d96", "#fdcc93", "#957e84",
+           "#30b6f3", "#604020", "#bd6e63", "#d11f0b", "#809776", "#f764de")
+
+
+pcaStd <- function(file012, xAxis, yAxis, groupDF){
+  df012 = fread(file012, sep = ',', data.table = F) %>%
+    filter(str_split_i(individual, '_', 2) %in% as.vector(unique(groupDF[,'ind']))) %>%
+    .[,-1] %>%
+    as.matrix()
+  colmean = apply(df012, 2, mean, na.rm=TRUE)
+  normalize = matrix(nrow = nrow(df012), ncol = ncol(df012))
+  af = colmean/2
+  for (m in 1:length(af)){
+    nr = df012[ ,m]-colmean[m]
+    dn = sqrt(af[m]*(1-af[m]))
+    normalize[ ,m] = nr/dn
+  }
+  normalize[is.nan(normalize)] = 0
+  pca012 = prcomp(normalize, scale. = F, center = F)
+  pcXvar = formatC(((summary(pca012)$importance[2,as.integer(str_sub(xAxis, 3, 3))])*100), 
+                   digits = 1, format = 'f')
+  pcYvar = formatC(((summary(pca012)$importance[2,as.integer(str_sub(yAxis, 3, 3))])*100), 
+                   digits = 1, format = 'f')
+  pca012_loading = pca012$x
+  pca_df = pca012_loading[,1:6]
+  pca_df = cbind(groupDF, pca_df) %>%
+    mutate(Pop = factor(Pop))
+  pcaPlot <- ggplot(data = pca_df, 
+                  aes(x = .data[[xAxis]], y = .data[[yAxis]], fill = Pop, color = Pop)) +
+    geom_point(size = 4, 
+               stroke = 0.75, pch = 21) + 
+    xlab(paste("PC",(str_sub(xAxis, 3, 3))," (",pcXvar,"%)",sep="")) +
+    ylab(paste("PC",(str_sub(yAxis, 3, 3))," (",pcYvar,"%)",sep="")) +
+    scale_fill_manual(values = col31) +
+    scale_color_manual(values = darken(col31, 0.3)) +
+    # scale_x_continuous(limits = c(-65, 85), breaks = seq(-50, 75, 25)) +
+    # scale_y_continuous(limits = c(-70, 30), breaks = seq(-50, 25, 25)) +
+    theme_bw() + 
+    theme(legend.position = 'none',
+          axis.text = element_text(size = 10),
+          axis.title.y.left = element_text(size = 16,
+                                           face = 'bold',
+                                           vjust = 0),
+          axis.title.x.bottom = element_text(size = 16,
+                                             face = 'bold',
+                                             vjust = 1),
+          panel.border = element_rect(linewidth = 1.5, color = "black"),
+          legend.text = element_text(size = 13),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          plot.margin = margin(t = 5, r = 5, b = 5, l = 5, unit = 'pt'))
+  return(pcaPlot)
+}
+
+
+fwStd <- function(file012, xAxis, yAxis, groupDF){
+  df012 = fread(file012, sep = ',', data.table = F) %>%
+    filter(str_split_i(individual, '_', 2) %in% as.vector(unique(groupDF[,'ind']))) %>%
+    .[,-1] %>%
+    as.matrix()
+  colmean = apply(df012, 2, mean, na.rm=TRUE)
+  normalize = matrix(nrow = nrow(df012), ncol = ncol(df012))
+  af = colmean/2
+  for (m in 1:length(af)){
+    nr = df012[ ,m]-colmean[m]
+    dn = sqrt(af[m]*(1-af[m]))
+    normalize[ ,m] = nr/dn
+  }
+  normalize[is.nan(normalize)] = 0
+  pca012 = prcomp(normalize, scale. = F, center = F)
+  pcXvar = formatC(((summary(pca012)$importance[2,as.integer(str_sub(xAxis, 3, 3))])*100), 
+                   digits = 1, format = 'f')
+  pcYvar = formatC(((summary(pca012)$importance[2,as.integer(str_sub(yAxis, 3, 3))])*100), 
+                   digits = 1, format = 'f')
+  pca012_loading = pca012$x
+  pca_df = pca012_loading[,1:6]
+  pca_df = cbind(groupDF, pca_df) %>%
+    mutate(Pop = factor(Pop))
+  pca_mean <- pca_df %>% 
+    group_by(Pop) %>% 
+    summarize(PC1_mean=mean(PC1),PC2_mean=mean(PC2),PC3_mean=mean(PC3),
+              PC4_mean=mean(PC4),PC5_mean=mean(PC5),PC6_mean=mean(PC6))
+  pca_df <- left_join(pca_df,pca_mean)
+  pca_fw <- ggplot(data = pca_mean, 
+                   aes(x = .data[[paste(xAxis,'mean',sep='_')]],
+                       y = .data[[paste(yAxis,'mean',sep='_')]],
+                       fill=Pop,color=Pop)) +
+    geom_segment(data=pca_df,
+                 aes(x = .data[[xAxis]],y = .data[[yAxis]],
+                     xend = .data[[paste(xAxis,'mean',sep='_')]],
+                     yend = .data[[paste(yAxis,'mean',sep='_')]])) +
+    geom_point(size = 4, 
+               stroke = 0.75, pch = 21) + 
+    xlab(paste("PC",(str_sub(xAxis, 3, 3))," (",pcXvar,"%)",sep="")) +
+    ylab(paste("PC",(str_sub(yAxis, 3, 3))," (",pcYvar,"%)",sep="")) +
+    scale_fill_manual(values = col31) +
+    scale_color_manual(values = darken(col31, 0.3)) +
+    theme_bw() +
+    theme(legend.position = 'none',
+          axis.text = element_text(size = 10),
+          axis.title.y.left = element_text(size = 16,
+                                           face = 'bold',
+                                           vjust = 0),
+          axis.title.x.bottom = element_text(size = 16,
+                                             face = 'bold',
+                                             vjust = 1),
+          panel.border = element_rect(linewidth = 1.5, color = "black"),
+          legend.text = element_text(size = 13),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          plot.margin = margin(t = 5, r = 5, b = 5, l = 5, unit = 'pt'))
+  return(pca_fw)
+}
+
+# df012 = fread('entropy/gprob7.txt', sep = ',', data.table = F) %>%
+#   filter(str_split_i(individual, '_', 2) %in% as.vector(unique(magentaGroup$ind))) %>%
+#   .[,-1] %>%
+#   as.matrix()
+# col_ranges <- apply(df012, 2, function(x) diff(range(x)))
+# mat_filtered <- df012[, col_ranges > 0.5]
+# pca012 = prcomp(df012, scale. = F, center = T)
+# pc1var = formatC(((summary(pca012)$importance[2,1])*100), digits = 1, format = 'f')
+# pc2var = formatC(((summary(pca012)$importance[2,2])*100), digits = 1, format = 'f')
+# pc3var = formatC(((summary(pca012)$importance[2,3])*100), digits = 1, format = 'f')
+# pc4var = formatC(((summary(pca012)$importance[2,4])*100), digits = 1, format = 'f')
+# pc5var = formatC(((summary(pca012)$importance[2,5])*100), digits = 1, format = 'f')
+# pc6var = formatC(((summary(pca012)$importance[2,6])*100), digits = 1, format = 'f')
+# pca012_loading = pca012$x
+# pca_df = pca012_loading[,1:6]
+# pca_df = cbind(greenGroup, pca_df) %>%
+#   mutate(Pop = factor(Pop))
+# 
+# df012 = fread('entropy/gprob7.txt', sep = ',', data.table = F) %>%
+#   filter(str_split_i(individual, '_', 2) %in% as.vector(unique(magentaGroup$ind))) %>%
+#   .[,-1] %>%
+#   as.matrix()
+# colmean = apply(df012, 2, mean, na.rm=TRUE)
+# normalize = matrix(nrow = nrow(df012), ncol = ncol(df012))
+# af = colmean/2
+# for (m in 1:length(af)){
+#   nr = df012[ ,m]-colmean[m]
+#   dn = sqrt(af[m]*(1-af[m]))
+#   normalize[ ,m] = nr/dn
+# }
+# normalize[is.nan(normalize)] = 0
+# pca012 = prcomp(normalize, scale. = F, center = F)
+# pc1var = formatC(((summary(pca012)$importance[2,1])*100), digits = 1, format = 'f')
+# pc2var = formatC(((summary(pca012)$importance[2,2])*100), digits = 1, format = 'f')
+# pc3var = formatC(((summary(pca012)$importance[2,3])*100), digits = 1, format = 'f')
+# pc4var = formatC(((summary(pca012)$importance[2,4])*100), digits = 1, format = 'f')
+# pc5var = formatC(((summary(pca012)$importance[2,5])*100), digits = 1, format = 'f')
+# pc6var = formatC(((summary(pca012)$importance[2,6])*100), digits = 1, format = 'f')
+# pca012_loading = pca012$x
+# pca_df = pca012_loading[,1:6]
+# pca_df = cbind(magentaGroup, pca_df) %>%
+#   mutate(Pop = factor(Pop))
+# 
+# pca12 <- ggplot(data = pca_df, 
+#                 aes(x = PC1, y = PC2, fill = Pop, color = Pop)) +
+#   geom_point(size = 4, 
+#              stroke = 0.75, pch = 21) + 
+#   xlab(paste("PC",1," (",pc1var,"%)",sep="")) +
+#   ylab(paste("PC",2," (",pc2var,"%)",sep="")) +
+#   scale_fill_manual(values = col31) +
+#   scale_color_manual(values = darken(col31, 0.3)) +
+#   # scale_x_continuous(limits = c(-65, 85), breaks = seq(-50, 75, 25)) +
+#   # scale_y_continuous(limits = c(-70, 30), breaks = seq(-50, 25, 25)) +
+#   theme_bw() + 
+#   theme(legend.position = 'none',
+#         axis.text = element_text(size = 10),
+#         axis.title.y.left = element_text(size = 16,
+#                                          face = 'bold',
+#                                          vjust = 0),
+#         axis.title.x.bottom = element_text(size = 16,
+#                                          face = 'bold',
+#                                          vjust = 1),
+#         panel.border = element_rect(linewidth = 1.5, color = "black"),
+#         legend.text = element_text(size = 13),
+#         panel.grid.major = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         plot.margin = margin(t = 5, r = 5, b = 5, l = 5, unit = 'pt'))
+# pca12
+# 
+# hist(greenGroup$mean)
+```
+
+```{r, warning = F, fig.width=8, fig.height=8}
+ancCols <- c("#2364AF", "#489236", "#ba039b", "#F45812", "#ffa5ca", "#502c75", "#b6e7e0", "#fdec49")
+ancCols_d3 <- darken(ancCols, amount = 0.3)
+
+
+df012 = fread('entropy/gprob7.txt', sep = ',', data.table = F)[,-1] %>%
+  as.matrix()
+pca012 = prcomp(df012, scale. = F, center = T)
+pc1var = formatC(((summary(pca012)$importance[2,1])*100), digits = 1, format = 'f')
+pc2var = formatC(((summary(pca012)$importance[2,2])*100), digits = 1, format = 'f')
+pc3var = formatC(((summary(pca012)$importance[2,3])*100), digits = 1, format = 'f')
+pc4var = formatC(((summary(pca012)$importance[2,4])*100), digits = 1, format = 'f')
+pc5var = formatC(((summary(pca012)$importance[2,5])*100), digits = 1, format = 'f')
+pc6var = formatC(((summary(pca012)$importance[2,6])*100), digits = 1, format = 'f')
+pca012_loading = pca012$x
+pca_df = pca012_loading[,1:6]
+pca_df = cbind(ELELpop, pca_df) %>%
+  mutate(ancGroup = ifelse(ID %in% as.vector(unique(blueGroup$ID)), 'Blue Cluster',
+                           ifelse(ID %in% as.vector(unique(yellowGroup$ID)), 'Yellow Cluster',
+                                  ifelse(ID %in% as.vector(unique(skyGroup$ID)), 'Sky Cluster',
+                                         ifelse(ID %in% as.vector(unique(magentaGroup$ID)), 'Magenta Cluster',
+                                                ifelse(ID %in% as.vector(unique(greenGroup$ID)), 'Green Cluster',
+                                                       ifelse(ID %in% as.vector(unique(pinkGroup$ID)), 'Pink Cluster',
+                                                              ifelse(ID %in% as.vector(unique(purpleGroup$ID)), 'Purple Cluster',
+                                                                     'Mix'))))))))
+
+pca12raw <- ggplot(data = pca_df, 
+                aes(x = PC1, y = PC2, fill = ancGroup, color = ancGroup)) +
+  geom_point(size = 4, 
+             stroke = 0.75, pch = 21) + 
+  xlab(paste("PC",1," (",pc1var,"%)",sep="")) +
+  ylab(paste("PC",2," (",pc2var,"%)",sep="")) +
+  scale_fill_manual(values = ancCols) +
+  scale_color_manual(values = ancCols_d3) +
+  # scale_x_continuous(limits = c(-65, 85), breaks = seq(-50, 75, 25)) +
+  # scale_y_continuous(limits = c(-70, 30), breaks = seq(-50, 25, 25)) +
+  theme_bw() + 
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title.y.left = element_text(size = 24,
+                                         face = 'bold',
+                                         vjust = 1),
+        axis.title.x.bottom = element_text(size = 24,
+                                         face = 'bold',
+                                         vjust = -1),
+        panel.border = element_rect(linewidth = 1.5, color = "black"),
+        legend.text = element_text(size = 13),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(t = 25, r = 5, b = 25, l = 10, unit = 'pt'))
+pca34raw <- ggplot(data = pca_df, 
+                aes(x = PC3, y = PC4, fill = ancGroup, color = ancGroup)) +
+  geom_point(size = 4, 
+             stroke = 0.75, pch = 21) + 
+  xlab(paste("PC",3," (",pc3var,"%)",sep="")) +
+  ylab(paste("PC",4," (",pc4var,"%)",sep="")) +
+  scale_fill_manual(values = ancCols) +
+  scale_color_manual(values = ancCols_d3) +
+  # scale_x_continuous(limits = c(-65, 85), breaks = seq(-50, 75, 25)) +
+  # scale_y_continuous(limits = c(-70, 30), breaks = seq(-50, 25, 25)) +
+  theme_bw() + 
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title.y.left = element_text(size = 24,
+                                         face = 'bold',
+                                         vjust = 1),
+        axis.title.x.bottom = element_text(size = 24,
+                                         face = 'bold',
+                                         vjust = -1),
+        panel.border = element_rect(linewidth = 1.5, color = "black"),
+        legend.text = element_text(size = 13),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(t = 25, r = 5, b = 25, l = 10, unit = 'pt'))
+
+df012 = fread('entropy/gprob7.txt', sep = ',', data.table = F) %>%
+  .[,-1] %>%
+  as.matrix()
+colmean = apply(df012, 2, mean, na.rm=TRUE)
+normalize = matrix(nrow = nrow(df012), ncol = ncol(df012))
+af = colmean/2
+for (m in 1:length(af)){
+  nr = df012[ ,m]-colmean[m]
+  dn = sqrt(af[m]*(1-af[m]))
+  normalize[ ,m] = nr/dn
+}
+normalize[is.na(normalize)]<-0
+pca012 = prcomp(normalize, scale. = F, center = F)
+pc1var = formatC(((summary(pca012)$importance[2,1])*100), digits = 1, format = 'f')
+pc2var = formatC(((summary(pca012)$importance[2,2])*100), digits = 1, format = 'f')
+pc3var = formatC(((summary(pca012)$importance[2,3])*100), digits = 1, format = 'f')
+pc4var = formatC(((summary(pca012)$importance[2,4])*100), digits = 1, format = 'f')
+pc5var = formatC(((summary(pca012)$importance[2,5])*100), digits = 1, format = 'f')
+pc6var = formatC(((summary(pca012)$importance[2,6])*100), digits = 1, format = 'f')
+pca012_loading = pca012$x
+pca_df = pca012_loading[,1:6]
+pca_df = cbind(ELELpop, pca_df) %>%
+  mutate(ancGroup = ifelse(ID %in% as.vector(unique(blueGroup$ID)), 'Blue Cluster',
+                           ifelse(ID %in% as.vector(unique(yellowGroup$ID)), 'Yellow Cluster',
+                                  ifelse(ID %in% as.vector(unique(skyGroup$ID)), 'Sky Cluster',
+                                         ifelse(ID %in% as.vector(unique(magentaGroup$ID)), 'Magenta Cluster',
+                                                ifelse(ID %in% as.vector(unique(greenGroup$ID)), 'Green Cluster',
+                                                       ifelse(ID %in% as.vector(unique(pinkGroup$ID)), 'Pink Cluster',
+                                                              ifelse(ID %in% as.vector(unique(purpleGroup$ID)), 'Purple Cluster',
+                                                                     'Mix'))))))))
+
+pca12std <- ggplot(data = pca_df, 
+                aes(x = PC1, y = PC2, fill = ancGroup, color = ancGroup)) +
+  geom_point(size = 4, 
+             stroke = 0.75, pch = 21) + 
+  xlab(paste("PC",1," (",pc1var,"%)",sep="")) +
+  ylab(paste("PC",2," (",pc2var,"%)",sep="")) +
+  scale_fill_manual(values = ancCols) +
+  scale_color_manual(values = ancCols_d3) +
+  # scale_x_continuous(limits = c(-65, 85), breaks = seq(-50, 75, 25)) +
+  # scale_y_continuous(limits = c(-70, 30), breaks = seq(-50, 25, 25)) +
+  theme_bw() + 
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title.y.left = element_text(size = 24,
+                                         face = 'bold',
+                                         vjust = 1),
+        axis.title.x.bottom = element_text(size = 24,
+                                         face = 'bold',
+                                         vjust = -1),
+        panel.border = element_rect(linewidth = 1.5, color = "black"),
+        legend.text = element_text(size = 13),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(t = 25, r = 5, b = 25, l = 10, unit = 'pt'))
+
+pca34std <- ggplot(data = pca_df, 
+                aes(x = PC3, y = PC4, fill = ancGroup, color = ancGroup)) +
+  geom_point(size = 4, 
+             stroke = 0.75, pch = 21) + 
+  xlab(paste("PC",3," (",pc3var,"%)",sep="")) +
+  ylab(paste("PC",4," (",pc4var,"%)",sep="")) +
+  scale_fill_manual(values = ancCols) +
+  scale_color_manual(values = ancCols_d3) +
+  # scale_x_continuous(limits = c(-65, 85), breaks = seq(-50, 75, 25)) +
+  # scale_y_continuous(limits = c(-70, 30), breaks = seq(-50, 25, 25)) +
+  theme_bw() + 
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title.y.left = element_text(size = 24,
+                                         face = 'bold',
+                                         vjust = 1),
+        axis.title.x.bottom = element_text(size = 24,
+                                         face = 'bold',
+                                         vjust = -1),
+        panel.border = element_rect(linewidth = 1.5, color = "black"),
+        legend.text = element_text(size = 13),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(t = 25, r = 5, b = 25, l = 10, unit = 'pt'))
+```
+
+# All individuals colored by cluster (raw gt matrix)
+
+```{r, warning = F, fig.width=14, fig.height=7}
+pca12raw + pca34raw + plot_layout(nrow = 1)
+```
+
+# All individuals colored by cluster (Patterson standardization)
+
+```{r, warning = F, fig.width=14, fig.height=7}
+pca12std + pca34std + plot_layout(nrow = 1)
+```
+
+```{r, include=FALSE, fig.width=14, fig.height=12}
+cList <- c('United States of America', 'Canada', 'Mexico')
+
+countries <- ne_load(scale = 10, type = 'admin_0_countries', 
+                     destdir = '../ExSitu_v_InSitu/KRLA/maps/', returnclass = 'sf') %>%
+  filter(GEOUNIT %in% cList)
+states <- ne_load(scale = 10, type = 'admin_1_states_provinces', 
+                  destdir = '../ExSitu_v_InSitu/KRLA/maps/', returnclass = 'sf') %>%
+  filter(geonunit %in% cList)
+rivers_major <- ne_load(scale = 10, type = 'rivers_lake_centerlines', 
+                        destdir = '../ExSitu_v_InSitu/KRLA/maps/', returnclass = 'sf')
+rivers_minor <- ne_load(scale = 10, type = 'rivers_north_america', 
+                        destdir = '../ExSitu_v_InSitu/KRLA/maps/', returnclass = 'sf')
+lakes_major <- ne_load(scale = 10, type = 'lakes', destdir = '../ExSitu_v_InSitu/KRLA/maps/', returnclass = 'sf')
+lakes_minor <- ne_load(scale = 10, type = 'lakes_north_america', 
+                       destdir = '../ExSitu_v_InSitu/KRLA/maps/', returnclass = 'sf')
+
+prjPoints <- function(data){
+  output = dplyr::select(data, Long, Lat) %>%
+    relocate(Long, .before = Lat) %>%
+    as.matrix() %>%
+    st_multipoint() %>%
+    st_sfc(crs = 4326) %>%
+    st_transform(crs = target_crs) %>%
+    .[[1]] %>% 
+    as.matrix() %>%
+    as.data.frame() %>%
+    rename(prjy = 2, prjx = 1) %>%
+    cbind(data)
+  return(output)
+}
+
+zoom_to <- c(-114, 38.6)
+
+zoom_level <- 4.8
+
+C <- 40075016.686
+x_offset <- 0
+y_offset <- -200000
+
+
+x_span <- (C / 2^(zoom_level)) + x_offset
+y_span <- (C / 2^(zoom_level)) + y_offset
+
+target_crs <- sprintf('+proj=laea +lon_0=%f +lat_0=%f', zoom_to[1], zoom_to[2])
+zoom_to_xy <- st_transform(st_sfc(st_point(zoom_to), crs = 4326), crs = target_crs)
+
+disp_window <- st_sfc(st_point(st_coordinates(zoom_to_xy - c(x_span / 2, y_span / 2))),
+                      st_point(st_coordinates(zoom_to_xy + c(x_span / 2, y_span / 2))),
+                      crs = target_crs)
+elev_window <- st_sfc(st_point(st_coordinates(zoom_to_xy - c((x_span*1.02) / 2, (y_span*1.05) / 2))),
+                      st_point(st_coordinates(zoom_to_xy + c((x_span*1.02) / 2, (y_span*1.1) / 2))),
+                      crs = target_crs)
+
+elev_rast <- get_elev_raster(locations = elev_window, z = 7, clip = 'tile') %>%
+  rast() %>%
+  mask(vect(st_transform(countries, crs = target_crs)))
+
+elev_df <- as.data.frame(elev_rast, xy = TRUE) %>%
+  rename(alt = 3)
+sl <- terrain(elev_rast, "slope", unit = "radians")
+asp <- terrain(elev_rast, "aspect", unit = "radians")
+hill_df <- shade(sl, asp, 
+      angle = 45, 
+      direction = 300,
+      normalize= TRUE) %>%
+  as.data.frame(xy = TRUE)
+
+elevLims <- minmax(elev_rast) %>%
+  as.integer() + c(400, -3100)
+
+baseMap <- ggplot() + 
+  geom_raster(data = hill_df,
+              aes(x, y, fill = hillshade),
+              show.legend = FALSE,
+              alpha = 0.8) +
+  scale_fill_distiller(palette = 'Greys') +
+  # scale_fill_gradient2(low = 'gray30', mid = 'grey95', high = "white", midpoint = 180) +
+  new_scale_fill() +
+  geom_raster(data = elev_df,
+              aes(x, y, fill = alt),
+              alpha = 0.25) +
+  scale_fill_hypso_c(palette = 'dem_print',
+                     limits = elevLims) +
+  geom_sf(data = rivers_major, color = "#0978AB", linewidth = 0.1) + 
+  geom_sf(data = rivers_minor, color = '#0978AB', linewidth = 0.1) +
+  geom_sf(data = lakes_major, color = '#0978AB', fill = 'lightblue', linewidth = 0.1) +
+  geom_sf(data = lakes_minor, color = '#0978AB', fill = 'lightblue', linewidth = 0.1) +
+  geom_sf(data = states, fill = NA, color = 'grey20', linewidth = 0.2) +
+  coord_sf(xlim = st_coordinates(disp_window)[,'X'],
+           ylim = st_coordinates(disp_window)[,'Y'],
+           crs = target_crs,
+           datum = target_crs) +
+  theme_bw() +
+  theme(panel.border = element_rect(linewidth = 1.5, color = 'black'),
+        legend.position = 'none',
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank(),
+        panel.background = element_rect(fill = 'lightblue'),
+        plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = 'pt'))
+```
+
+# All individuals pie charts
+
+```{r, fig.width = 12, fig.height = 10}
+allLocs <- prjPoints(AGRlocs)
+
+anck7pie <- read.csv('entropy/q7.txt') %>%
+  cbind(ELELpop) %>%
+  mutate(ancGroup = str_split_i(param, pattern = '_', i = -1))
+anck7pie$ancGroup <- factor(recode(anck7pie$ancGroup, '0' = '6', '2' = '4', '3' = '5', '4' = '0', '5' = '3', '6' = '2'))
+anck7pie <- anck7pie %>%
+  group_by(Pop, ancGroup) %>%
+  summarise(popMean = mean(mean)) %>%
+  full_join(allLocs, by = 'Pop') %>%
+  pivot_wider(values_from = popMean, names_from = ancGroup) %>%
+  rename(q0 = '0',
+         q1 = '1',
+         q2 = '2',
+         q3 = '3',
+         q4 = '4',
+         q5 = '5',
+         q6 = '6')
+k7PieMap <- baseMap +
+  new_scale_fill() +
+  geom_scatterpie(data = anck7pie,
+                  aes(x = prjx, y = prjy, group = Pop,
+                      r = 25000),
+                  cols = c('q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6'),
+                  linewidth = 0.4) +
+  scale_fill_manual(values = lupi7)
+  # annotate('label', x = 200000, y = 350000, 
+  #          label = 'K = 3',
+  #          size = 15,
+  #          color = 'black',
+  #          fill = 'white')
+  
+k7PieMap
+```
+
+# Dark Blue cluster
+
+```{r, fig.width=20, fig.height=10}
+blue12 <- pcaStd('entropy/gprob7.txt', 'PC1', 'PC2', blueGroup)
+blue34 <- pcaStd('entropy/gprob7.txt', 'PC3', 'PC4', blueGroup)
+blueFW12 <- fwStd('entropy/gprob7.txt', 'PC1', 'PC2', blueGroup)
+blueFW34 <- fwStd('entropy/gprob7.txt', 'PC3', 'PC4', blueGroup)
+
+
+allLocs <- prjPoints(AGRlocs)
+blueLocs <- subset(allLocs, Pop %in% as.vector(unique(blueGroup$Pop))) %>%
+  mutate(Pop = factor(Pop, levels = eePopOrder))
+nonLocs <- subset(allLocs, !(Pop %in% as.vector(unique(blueLocs$Pop))))
+
+
+sampleMap <- baseMap +
+  new_scale_fill() +
+  scale_fill_manual(values = col31) +
+  scale_color_manual(values = darken(col31, 0.3)) +
+  geom_point(data = nonLocs, aes(x = prjx, y = prjy),
+             size = 8,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 0.7) +
+  geom_point(data = blueLocs, aes(x = prjx, y = prjy),
+             size = 3,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 1) +
+  geom_label_repel(data = blueLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = 1.5,
+                   max.overlaps = 20,
+                   seed = 1234) +
+  geom_label_repel(data = blueLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = NA,
+                   max.overlaps = 20,
+                   color = 'black',
+                   seed = 1234)
+
+layout <- "
+AABBCC
+AADDEE
+"
+
+free(sampleMap) + blue12 + blueFW12 + blue34 + blueFW34 +
+  plot_layout(design = layout,
+              widths = unit(c(18, 7, 5.5, 5.5, 5.5, 5.5), c('cm', 'cm', 'cm', 'cm', 'cm', 'cm')))
+```
+
+# Sky Blue cluster
+
+```{r, fig.width=20, fig.height=10}
+sky12 <- pcaStd('entropy/gprob7.txt', 'PC1', 'PC2', skyGroup)
+sky34 <- pcaStd('entropy/gprob7.txt', 'PC3', 'PC4', skyGroup)
+skyFW12 <- fwStd('entropy/gprob7.txt', 'PC1', 'PC2', skyGroup)
+skyFW34 <- fwStd('entropy/gprob7.txt', 'PC3', 'PC4', skyGroup)
+
+allLocs <- prjPoints(AGRlocs)
+skyLocs <- subset(allLocs, Pop %in% as.vector(unique(skyGroup$Pop))) %>%
+  mutate(Pop = factor(Pop, levels = eePopOrder))
+nonLocs <- subset(allLocs, !(Pop %in% as.vector(unique(skyLocs$Pop))))
+
+
+sampleMap <- baseMap +
+  new_scale_fill() +
+  scale_fill_manual(values = col31) +
+  scale_color_manual(values = darken(col31, 0.3)) +
+  geom_point(data = nonLocs, aes(x = prjx, y = prjy),
+             size = 8,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 0.7) +
+  geom_point(data = skyLocs, aes(x = prjx, y = prjy),
+             size = 3,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 1) +
+  geom_label_repel(data = skyLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = 1.5,
+                   max.overlaps = 20,
+                   seed = 1234) +
+  geom_label_repel(data = skyLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = NA,
+                   max.overlaps = 20,
+                   color = 'black',
+                   seed = 1234)
+
+layout <- "
+AABBCC
+AADDEE
+"
+
+free(sampleMap) + sky12 + skyFW12 + sky34 + skyFW34 +
+  plot_layout(design = layout,
+              widths = unit(c(18, 7, 5.5, 5.5, 5.5, 5.5), c('cm', 'cm', 'cm', 'cm', 'cm', 'cm')))
+```
+
+# Magenta cluster
+
+```{r, fig.width=20, fig.height=10}
+magenta12 <- pcaStd('entropy/gprob7.txt', 'PC1', 'PC2', magentaGroup)
+magenta34 <- pcaStd('entropy/gprob7.txt', 'PC3', 'PC4', magentaGroup)
+magentaFW12 <- fwStd('entropy/gprob7.txt', 'PC1', 'PC2', magentaGroup)
+magentaFW34 <- fwStd('entropy/gprob7.txt', 'PC3', 'PC4', magentaGroup)
+
+allLocs <- prjPoints(AGRlocs)
+magentaLocs <- subset(allLocs, Pop %in% as.vector(unique(magentaGroup$Pop))) %>%
+  mutate(Pop = factor(Pop, levels = eePopOrder))
+nonLocs <- subset(allLocs, !(Pop %in% as.vector(unique(magentaLocs$Pop))))
+
+
+sampleMap <- baseMap +
+  new_scale_fill() +
+  scale_fill_manual(values = col31) +
+  scale_color_manual(values = darken(col31, 0.3)) +
+  geom_point(data = nonLocs, aes(x = prjx, y = prjy),
+             size = 8,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 0.7) +
+  geom_point(data = magentaLocs, aes(x = prjx, y = prjy),
+             size = 3,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 1) +
+  geom_label_repel(data = magentaLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = 1.5,
+                   max.overlaps = 20,
+                   seed = 1234) +
+  geom_label_repel(data = magentaLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = NA,
+                   max.overlaps = 20,
+                   color = 'black',
+                   seed = 1234) +
+  annotate('label', x = -600000, y = -520000, 
+           label = '"Pueblo"\nCultivar',
+           size = 5,
+           color = darken('#5e9222', 0.3),
+           fontface = "bold",
+           fill = '#5e9222',
+           # label.padding = 0.25,
+           label.r = unit(5, "pt"),
+           label.size = 1.5) +
+  annotate('label', x = -600000, y = -520000, 
+           label = '"Pueblo"\nCultivar',
+           size = 5,
+           color = 'black',
+           fontface = "bold",
+           fill = '#5e9222',
+           # label.padding = 0.25,
+           label.r = unit(5, "pt"),
+           label.size = NA)
+
+layout <- "
+AABBCC
+AADDEE
+"
+
+free(sampleMap) + magenta12 + magentaFW12 + magenta34 + magentaFW34 +
+  plot_layout(design = layout,
+              widths = unit(c(18, 7, 5.5, 5.5, 5.5, 5.5), c('cm', 'cm', 'cm', 'cm', 'cm', 'cm')))
+```
+
+# Yellow cluster
+
+```{r, fig.width=20, fig.height=10}
+yellow12 <- pcaStd('entropy/gprob7.txt', 'PC1', 'PC2', yellowGroup)
+yellow34 <- pcaStd('entropy/gprob7.txt', 'PC3', 'PC4', yellowGroup)
+yellowFW12 <- fwStd('entropy/gprob7.txt', 'PC1', 'PC2', yellowGroup)
+yellowFW34 <- fwStd('entropy/gprob7.txt', 'PC3', 'PC4', yellowGroup)
+
+allLocs <- prjPoints(AGRlocs)
+yellowLocs <- subset(allLocs, Pop %in% as.vector(unique(yellowGroup$Pop))) %>%
+  mutate(Pop = factor(Pop, levels = eePopOrder))
+nonLocs <- subset(allLocs, !(Pop %in% as.vector(unique(yellowLocs$Pop))))
+
+
+sampleMap <- baseMap +
+  new_scale_fill() +
+  scale_fill_manual(values = col31) +
+  scale_color_manual(values = darken(col31, 0.3)) +
+  geom_point(data = nonLocs, aes(x = prjx, y = prjy),
+             size = 8,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 0.7) +
+  geom_point(data = yellowLocs, aes(x = prjx, y = prjy),
+             size = 3,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 1) +
+  geom_label_repel(data = yellowLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = 1.5,
+                   max.overlaps = 20,
+                   seed = 1234) +
+  geom_label_repel(data = yellowLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = NA,
+                   max.overlaps = 20,
+                   color = 'black',
+                   seed = 1234)
+
+layout <- "
+AABBCC
+AADDEE
+"
+
+free(sampleMap) + yellow12 + yellowFW12 + yellow34 + yellowFW34 +
+  plot_layout(design = layout,
+              widths = unit(c(18, 7, 5.5, 5.5, 5.5, 5.5), c('cm', 'cm', 'cm', 'cm', 'cm', 'cm')))
+```
+
+# Green cluster
+
+```{r, fig.width=20, fig.height=10}
+green12 <- pcaStd('entropy/gprob7.txt', 'PC1', 'PC2', greenGroup)
+green34 <- pcaStd('entropy/gprob7.txt', 'PC3', 'PC4', greenGroup)
+greenFW12 <- fwStd('entropy/gprob7.txt', 'PC1', 'PC2', greenGroup)
+greenFW34 <- fwStd('entropy/gprob7.txt', 'PC3', 'PC4', greenGroup)
+
+allLocs <- prjPoints(AGRlocs)
+greenLocs <- subset(allLocs, Pop %in% as.vector(unique(greenGroup$Pop))) %>%
+  mutate(Pop = factor(Pop, levels = eePopOrder))
+nonLocs <- subset(allLocs, !(Pop %in% as.vector(unique(greenLocs$Pop))))
+
+
+sampleMap <- baseMap +
+  new_scale_fill() +
+  scale_fill_manual(values = col31) +
+  scale_color_manual(values = darken(col31, 0.3)) +
+  geom_point(data = nonLocs, aes(x = prjx, y = prjy),
+             size = 8,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 0.7) +
+  geom_point(data = greenLocs, aes(x = prjx, y = prjy),
+             size = 3,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 1) +
+  geom_label_repel(data = greenLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = 1.5,
+                   max.overlaps = 20,
+                   seed = 1234) +
+  geom_label_repel(data = greenLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = NA,
+                   max.overlaps = 20,
+                   color = 'black',
+                   seed = 1234) +
+  annotate('label', x = -600000, y = -520000, 
+           label = '"Toe Jam Creek"\nCultivar',
+           size = 5,
+           color = darken('#fbd127', 0.3),
+           fontface = "bold",
+           fill = '#fbd127',
+           # label.padding = 0.25,
+           label.r = unit(5, "pt"),
+           label.size = 1.5) +
+  annotate('label', x = -600000, y = -520000, 
+           label = '"Toe Jam Creek"\nCultivar',
+           size = 5,
+           color = 'black',
+           fontface = "bold",
+           fill = '#fbd127',
+           # label.padding = 0.25,
+           label.r = unit(5, "pt"),
+           label.size = NA)
+
+layout <- "
+AABBCC
+AADDEE
+"
+
+free(sampleMap) + green12 + greenFW12 + green34 + greenFW34 +
+  plot_layout(design = layout,
+              widths = unit(c(18, 7, 5.5, 5.5, 5.5, 5.5), c('cm', 'cm', 'cm', 'cm', 'cm', 'cm')))
+  # plot_layout(widths = unit(c(32, 22), c('cm', 'cm')),
+```
+
+# Pink cluster
+
+```{r, fig.width=20, fig.height=10}
+pink12 <- pcaStd('entropy/gprob7.txt', 'PC1', 'PC2', pinkGroup)
+pink34 <- pcaStd('entropy/gprob7.txt', 'PC3', 'PC4', pinkGroup)
+pinkFW12 <- fwStd('entropy/gprob7.txt', 'PC1', 'PC2', pinkGroup)
+pinkFW34 <- fwStd('entropy/gprob7.txt', 'PC3', 'PC4', pinkGroup)
+
+allLocs <- prjPoints(AGRlocs)
+pinkLocs <- subset(allLocs, Pop %in% as.vector(unique(pinkGroup$Pop))) %>%
+  mutate(Pop = factor(Pop, levels = eePopOrder))
+nonLocs <- subset(allLocs, !(Pop %in% as.vector(unique(pinkLocs$Pop))))
+
+
+sampleMap <- baseMap +
+  new_scale_fill() +
+  scale_fill_manual(values = col31) +
+  scale_color_manual(values = darken(col31, 0.3)) +
+  geom_point(data = nonLocs, aes(x = prjx, y = prjy),
+             size = 8,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 0.7) +
+  geom_point(data = pinkLocs, aes(x = prjx, y = prjy),
+             size = 3,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 1) +
+  geom_label_repel(data = pinkLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = 1.5,
+                   max.overlaps = 20,
+                   seed = 1234) +
+  geom_label_repel(data = pinkLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = NA,
+                   max.overlaps = 20,
+                   color = 'black',
+                   seed = 1234)
+
+layout <- "
+AABBCC
+AADDEE
+"
+
+free(sampleMap) + pink12 + pinkFW12 + pink34 + pinkFW34 +
+  plot_layout(design = layout,
+              widths = unit(c(18, 7, 5.5, 5.5, 5.5, 5.5), c('cm', 'cm', 'cm', 'cm', 'cm', 'cm')))
+```
+
+# Purple cluster
+
+```{r, fig.width=20, fig.height=10}
+purple12 <- pcaStd('entropy/gprob7.txt', 'PC1', 'PC2', purpleGroup)
+purple34 <- pcaStd('entropy/gprob7.txt', 'PC3', 'PC4', purpleGroup)
+purpleFW12 <- fwStd('entropy/gprob7.txt', 'PC1', 'PC2', purpleGroup)
+purpleFW34 <- fwStd('entropy/gprob7.txt', 'PC3', 'PC4', purpleGroup)
+
+allLocs <- prjPoints(AGRlocs)
+purpleLocs <- subset(allLocs, Pop %in% as.vector(unique(purpleGroup$Pop))) %>%
+  mutate(Pop = factor(Pop, levels = eePopOrder))
+nonLocs <- subset(allLocs, !(Pop %in% as.vector(unique(purpleLocs$Pop))))
+
+
+sampleMap <- baseMap +
+  new_scale_fill() +
+  scale_fill_manual(values = col31) +
+  scale_color_manual(values = darken(col31, 0.3)) +
+  geom_point(data = nonLocs, aes(x = prjx, y = prjy),
+             size = 8,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 0.7) +
+  geom_point(data = purpleLocs, aes(x = prjx, y = prjy),
+             size = 3,
+             color = 'black',
+             fill = 'white',
+             pch = 21,
+             alpha = 1) +
+  geom_label_repel(data = purpleLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = 1.5,
+                   max.overlaps = 20,
+                   seed = 1234) +
+  geom_label_repel(data = purpleLocs,
+                   aes(x = prjx, y = prjy, label = Pop, fill = Pop, color = Pop),
+                   fontface = "bold", size = 5, box.padding = 0.5,
+                   label.padding = 0.25,
+                   label.r = unit(5, "pt"),
+                   label.size = NA,
+                   max.overlaps = 20,
+                   color = 'black',
+                   seed = 1234)
+
+layout <- "
+AABBCC
+AADDEE
+"
+
+free(sampleMap) + purple12 + purpleFW12 + purple34 + purpleFW34 +
+  plot_layout(design = layout,
+              widths = unit(c(18, 7, 5.5, 5.5, 5.5, 5.5), c('cm', 'cm', 'cm', 'cm', 'cm', 'cm')))
+```

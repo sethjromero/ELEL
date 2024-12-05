@@ -1,0 +1,18 @@
+
+VCFtools - 0.1.14
+(C) Adam Auton and Anthony Marcketta 2009
+
+Parameters as interpreted:
+	--vcf RM.bithin.q30.iMajLL.a50.recode.vcf
+	--exclude indRMmajorLLmiss41.txt
+	--maf 0.03
+	--max-missing 0.8
+	--012
+	--out RM.bithin.q30.iMajLL41.a80.maf03
+	--remove-filtered-all
+
+Excluding individuals in 'exclude' list
+After filtering, kept 145 out of 157 Individuals
+Writing 012 matrix files ... Done.
+After filtering, kept 12671 out of a possible 220289 Sites
+Run Time = 13.00 seconds

@@ -1,0 +1,18 @@
+
+VCFtools - 0.1.14
+(C) Adam Auton and Anthony Marcketta 2009
+
+Parameters as interpreted:
+	--vcf ELEL.bithin.q30.recode.vcf
+	--keep indBS20miss90.txt
+	--maf 0.03
+	--max-missing 0.65
+	--depth
+	--out ELEL.bithin.q30.iBC20m90.a65.maf03
+	--remove-filtered-all
+
+Keeping individuals in 'keep' list
+After filtering, kept 695 out of 943 Individuals
+Outputting Mean Depth by Individual
+After filtering, kept 15512 out of a possible 592291 Sites
+Run Time = 104.00 seconds
